@@ -1,0 +1,1364 @@
+# Provider configuration
+terraform {
+  required_providers {
+    newrelic = {
+      source  = "newrelic/newrelic"
+      version = "~> 3.15.0"
+    }
+  }
+  required_version = ">= 0.13"
+}
+
+provider "newrelic" {
+  account_id = var.account_id
+  api_key    = var.api_key
+  region     = var.region
+}
+
+# Variables
+variable "account_id" {
+  description = "New Relic Account ID"
+  type        = number
+}
+
+variable "api_key" {
+  description = "New Relic API Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "region" {
+  description = "New Relic region (US or EU)"
+  type        = string
+  default     = "US"
+}
+
+# Create a single dashboard with multiple pages
+resource "newrelic_one_dashboard" "monitoring_dashboard" {
+  name        = "Complete Monitoring Metrics Dashboard"
+  permissions = "public_read_only"
+
+  # ===== PAGE 1: Synthetic Metrics =====
+  page {
+    name = "Synthetic Metrics"
+
+    widget_billboard {
+      title  = "Synthetic Transaction Success Rate"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') AS 'Success Rate' FACET monitorName LIMIT 25"
+      }
+    }
+
+    widget_line {
+      title  = "Synthetic User Journey"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT average(duration) AS 'Avg Duration' WHERE monitorType = 'SCRIPT_BROWSER' TIMESERIES FACET monitorName LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Synthetic Uptime"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') AS 'Uptime %' TIMESERIES FACET monitorName LIMIT 10"
+      }
+    }
+
+    widget_billboard {
+      title  = "Synthetic Response Time"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT average(duration) AS 'Avg Response Time' FACET monitorName LIMIT 25"
+      }
+    }
+    
+    widget_line {
+      title  = "Synthetic Availability"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') AS 'Availability %' TIMESERIES SINCE 7 days ago"
+      }
+    }
+
+    widget_pie {
+      title  = "Synthetic Error Rate"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT count(*) WHERE result != 'SUCCESS' FACET result SINCE 1 day ago"
+      }
+    }
+
+    widget_bar {
+      title  = "Synthetic Performance"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT average(duration) FACET monitorName LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Synthetic Load Testing"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticRequest SELECT average(duration) AS 'Response Time' TIMESERIES FACET request.uri LIMIT 10"
+      }
+    }
+
+    widget_billboard {
+      title  = "Synthetic SLA Compliance"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT percentage(count(*), WHERE result = 'SUCCESS' AND duration < 1000) AS 'SLA Compliance %'"
+      }
+    }
+
+    widget_line {
+      title  = "Synthetic Monitoring Coverage"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT uniqueCount(monitorName) TIMESERIES"
+      }
+    }
+  }
+
+  # ===== PAGE 2: Logs Metrics =====
+  page {
+    name = "Logs Metrics"
+
+    widget_area {
+      title  = "Log Volume"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT count(*) TIMESERIES"
+      }
+    }
+
+    widget_line {
+      title  = "Log Error Rate"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT percentage(count(*), WHERE level = 'error' OR level = 'critical') AS 'Error Rate' TIMESERIES"
+      }
+    }
+
+    widget_billboard {
+      title  = "Log Latency"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(newrelic.logs.delay) AS 'Log Latency (s)'"
+      }
+    }
+
+    widget_line {
+      title  = "Log Retention"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT count(*) TIMESERIES COMPARE WITH 7 days ago"
+      }
+    }
+
+    widget_bar {
+      title  = "Log Search Performance"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAuditEvent SELECT average(duration) WHERE actionIdentifier LIKE 'logQueryExecute' FACET targetId"
+      }
+    }
+
+    widget_line {
+      title  = "Log Anomaly Detection"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT count(*) TIMESERIES WHERE level = 'error' OR level = 'critical'"
+      }
+    }
+
+    widget_pie {
+      title  = "Log Parsing Accuracy"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT percentage(count(*), WHERE jsonParseError IS NULL) AS 'Parsing Success', percentage(count(*), WHERE jsonParseError IS NOT NULL) AS 'Parsing Error'"
+      }
+    }
+
+    widget_billboard {
+      title  = "Log Storage Utilization"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(newrelic.logs.bytes) / 1000000000 AS 'Log GB'"
+      }
+    }
+
+    widget_line {
+      title  = "Log Correlation"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT count(*) WHERE entity.guid IS NOT NULL FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_area {
+      title  = "Log Indexing Speed"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT rate(sum(newrelic.logs.events), 1 minute) TIMESERIES"
+      }
+    }
+
+    widget_line {
+      title  = "Log Ingestion Rate"
+      row    = 16
+      column = 1
+      width  = 8
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT rate(sum(newrelic.logs.bytes), 1 minute) / 1000000 AS 'MB/min' TIMESERIES"
+      }
+    }
+  }
+
+  # ===== PAGE 3: API Metrics =====
+  page {
+    name = "API Metrics"
+
+    widget_line {
+      title  = "API Performance"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT average(duration) AS 'Response Time' WHERE transactionType = 'Web' AND httpResponseCode LIKE '2%' TIMESERIES FACET name LIMIT 10"
+      }
+    }
+
+    widget_area {
+      title  = "Inbound/Outbound Analysis"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Span SELECT count(*) WHERE span.kind IN ('server', 'client') FACET span.kind TIMESERIES"
+      }
+    }
+
+    widget_billboard {
+      title  = "Service Levels"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT percentage(count(*), WHERE duration < 0.1) AS 'Fast', percentage(count(*), WHERE duration >= 0.1 AND duration < 1) AS 'Normal', percentage(count(*), WHERE duration >= 1) AS 'Slow' WHERE transactionType = 'Web'"
+      }
+    }
+
+    widget_line {
+      title  = "Connectivity"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT percentage(count(*), WHERE httpResponseCode NOT LIKE '5%') AS 'Connectivity' TIMESERIES"
+      }
+    }
+
+    widget_bar {
+      title  = "Error Rates"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT percentage(count(*), WHERE error IS TRUE) AS 'Error Rate' FACET appName LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "API Latency"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT average(duration), percentile(duration, 95) TIMESERIES WHERE transactionType = 'Web'"
+      }
+    }
+
+    widget_billboard {
+      title  = "Uptime"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') FACET monitorName LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "API Call Success Rate"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT percentage(count(*), WHERE error IS FALSE) AS 'Success Rate' TIMESERIES WHERE transactionType = 'Web'"
+      }
+    }
+
+    widget_billboard {
+      title  = "API Response Time"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT average(duration) AS 'Avg', percentile(duration, 95) AS '95th', max(duration) AS 'Max' WHERE transactionType = 'Web'"
+      }
+    }
+
+    widget_bar {
+      title  = "Rate Limiting"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT count(*) WHERE httpResponseCode = '429' FACET name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Throttling"
+      row    = 16
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT rate(count(*), 1 minute) TIMESERIES WHERE transactionType = 'Web'"
+      }
+    }
+
+    widget_pie {
+      title  = "API Versioning"
+      row    = 16
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT count(*) FACET `request.headers.accept` WHERE transactionType = 'Web' LIMIT 10"
+      }
+    }
+
+    widget_billboard {
+      title  = "Endpoint Availability"
+      row    = 19
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT percentage(count(*), WHERE httpResponseCode NOT LIKE '5%') AS 'Availability' FACET name LIMIT 5 WHERE transactionType = 'Web'"
+      }
+    }
+    
+    widget_billboard {
+      title  = "API Latency"
+      row    = 19
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT average(duration) WHERE transactionType = 'Web' FACET name LIMIT 10"
+      }
+    }
+
+    widget_bar {
+      title  = "API Error Codes"
+      row    = 22
+      column = 1
+      width  = 8
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT count(*) WHERE httpResponseCode LIKE '4%' OR httpResponseCode LIKE '5%' FACET httpResponseCode LIMIT 10"
+      }
+    }
+  }
+
+  # ===== PAGE 4: Alerts Metrics =====
+  page {
+    name = "Alerts Metrics"
+
+    widget_line {
+      title  = "Alert Frequency"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT count(*) TIMESERIES"
+      }
+    }
+
+    widget_bar {
+      title  = "Alert Response Time"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT average(closedAt - openedAt)/60 AS 'Avg Minutes to Close' FACET policy.name WHERE closedAt IS NOT NULL LIMIT 10"
+      }
+    }
+
+    widget_pie {
+      title  = "Critical Alerts"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT count(*) WHERE priority = 'critical' FACET policy.name LIMIT 10"
+      }
+    }
+
+    widget_pie {
+      title  = "Warning Alerts"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT count(*) WHERE priority = 'warning' FACET policy.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Alert Escalation"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncidentEvent SELECT count(*) TIMESERIES WHERE eventType = 'NrAiIncidentEscalated'"
+      }
+    }
+
+    widget_bar {
+      title  = "Alert Resolution Time"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT average(closedAt - openedAt)/60 AS 'Avg Minutes to Close' FACET policy.name WHERE closedAt IS NOT NULL LIMIT 10"
+      }
+    }
+
+    widget_billboard {
+      title  = "Alert Severity"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT count(*) FACET priority"
+      }
+    }
+
+    widget_line {
+      title  = "Alert Notification Time"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiNotification SELECT average(timestamp - incident.openedAt)/1000 AS 'Avg Seconds to Notify' TIMESERIES"
+      }
+    }
+
+    widget_bar {
+      title  = "Alert Acknowledgment Time"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncidentEvent SELECT average(timestamp - incident.openedAt)/60 AS 'Avg Minutes to Ack' FACET incident.policy.name WHERE eventType = 'NrAiIncidentAcknowledged' LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Alert Suppression Rate"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncidentEvent SELECT count(*) TIMESERIES WHERE eventType = 'NrAiIncidentMuted'"
+      }
+    }
+
+    widget_pie {
+      title  = "Alert Noise Ratio"
+      row    = 16
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT percentage(count(*), WHERE closedReason = 'resolved') AS 'Legitimate', percentage(count(*), WHERE closedReason = 'expired' OR closedReason = 'canceled') AS 'Noise'"
+      }
+    }
+
+    widget_line {
+      title  = "Alert History"
+      row    = 16
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT count(*) TIMESERIES FACET priority LIMIT 3"
+      }
+    }
+
+    widget_area {
+      title  = "Alert Trend Analysis"
+      row    = 19
+      column = 1
+      width  = 8
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAiIncident SELECT count(*) TIMESERIES COMPARE WITH 1 week ago"
+      }
+    }
+  }
+
+  # ===== PAGE 5: Browser Metrics =====
+  page {
+    name = "Browser Metrics"
+
+    widget_billboard {
+      title  = "Page Load Time"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT average(duration) AS 'Avg Load Time', percentile(duration, 95) AS '95th', max(duration) AS 'Max'"
+      }
+    }
+
+    widget_line {
+      title  = "Connectivity"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT percentage(count(*), WHERE pageUrl IS NOT NULL) AS 'Success %' TIMESERIES"
+      }
+    }
+
+    widget_bar {
+      title  = "Response Rate"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT count(*)/uniqueCount(session) AS 'Pages per Session' FACET deviceType LIMIT 3"
+      }
+    }
+
+    widget_pie {
+      title  = "Error Codes"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM JavaScriptError SELECT count(*) FACET errorClass LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Service Levels"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT percentage(count(*), WHERE duration < 3) AS 'Fast', percentage(count(*), WHERE duration >= 3 AND duration < 7) AS 'OK', percentage(count(*), WHERE duration >= 7) AS 'Slow' TIMESERIES"
+      }
+    }
+
+    widget_line {
+      title  = "Geographical Performance"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT average(duration) FACET countryCode LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Browser Compatibility"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT count(*) FACET userAgentName, userAgentVersion LIMIT 10"
+      }
+    }
+
+    widget_bar {
+      title  = "JavaScript Errors"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM JavaScriptError SELECT count(*) FACET errorMessage LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "User Interactions"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM BrowserInteraction SELECT count(*) TIMESERIES"
+      }
+    }
+
+    widget_line {
+      title  = "Security Vulnerabilities"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM JavaScriptError SELECT count(*) WHERE errorMessage LIKE '%security%' OR errorMessage LIKE '%vulnerability%' TIMESERIES"
+      }
+    }
+
+    widget_billboard {
+      title  = "Page Rendering Time"
+      row    = 16
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageViewTiming SELECT average(domProcessing) AS 'DOM Processing', average(domContentLoaded) AS 'DOM Content', average(firstPaint) AS 'First Paint'"
+      }
+    }
+
+    widget_line {
+      title  = "User Engagement"
+      row    = 16
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT average(timeOnPage) TIMESERIES"
+      }
+    }
+
+    widget_pie {
+      title  = "Browser Caching"
+      row    = 19
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT percentage(count(*), WHERE cacheHit IS TRUE) AS 'Cache Hit', percentage(count(*), WHERE cacheHit IS FALSE) AS 'Cache Miss'"
+      }
+    }
+
+    widget_line {
+      title  = "DOM Processing Time"
+      row    = 19
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageViewTiming SELECT average(domProcessing) TIMESERIES"
+      }
+    }
+
+    widget_bar {
+      title  = "SSL Certificate Errors"
+      row    = 22
+      column = 1
+      width  = 8
+      height = 3
+
+      nrql_query {
+        query = "FROM JavaScriptError SELECT count(*) WHERE errorMessage LIKE '%SSL%' OR errorMessage LIKE '%certificate%' FACET pageUrl LIMIT 10"
+      }
+    }
+  }
+
+  # ===== PAGE 6: Database Metrics =====
+  page {
+    name = "Database Metrics"
+
+    widget_billboard {
+      title  = "Database Availability"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT latest(provider.dbConnectionStatus) FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Database Performance"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(database.queriesPerSecond) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_bar {
+      title  = "Response Time on Queries"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(database.queryDuration) FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_pie {
+      title  = "Connection Pooling"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT latest(database.connectionsUsed) / latest(database.connectionsMax) * 100 AS 'Connection Pool Usage %' FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_bar {
+      title  = "Long Running Queries"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM DatabaseSlowQuery SELECT count(*) FACET databaseName, query LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Resource Utilisation"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuPercent), average(host.memoryUsedPercent) TIMESERIES WHERE entityType = 'DATABASE' FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Indexing Performance"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(database.indexSize) / 1000000 AS 'Index Size (MB)' FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "Transaction Rates"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT rate(sum(database.transactions), 1 minute) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_pie {
+      title  = "Cache Hit Ratio"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(database.cacheHitRatio) * 100 AS 'Cache Hit %' FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_bar {
+      title  = "Deadlocks"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(database.deadlocks) FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_billboard {
+      title  = "Query Execution Time"
+      row    = 16
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(database.queryDuration) * 1000 AS 'Query Time (ms)' FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "Backup Success Rate"
+      row    = 16
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT latest(database.backupSuccess) * 100 AS 'Backup Success %' TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Data Integrity"
+      row    = 19
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(database.checksumFailures) FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "Index Fragmentation"
+      row    = 19
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(database.indexFragmentation) * 100 AS 'Fragmentation %' TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+  }
+
+  # ===== PAGE 7: Application Monitoring Metrics =====
+  page {
+    name = "Application Monitoring Metrics"
+
+    widget_billboard {
+      title  = "App Availability"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT percentage(count(*), WHERE result = 'SUCCESS') FACET monitorName LIMIT 5"
+      }
+    }
+
+    widget_area {
+      title  = "Throughput"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT rate(count(*), 1 minute) TIMESERIES FACET appName LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "Latency Rate"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT average(duration), percentile(duration, 95) TIMESERIES FACET appName LIMIT 5"
+      }
+    }
+
+    widget_bar {
+      title  = "Error Rate"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT percentage(count(*), WHERE error IS TRUE) AS 'Error Rate' FACET appName LIMIT 10"
+      }
+    }
+
+    widget_area {
+      title  = "Garbage Collection"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(gc.majorCount) AS 'Major GC', average(gc.minorCount) AS 'Minor GC' TIMESERIES WHERE instrumentation.provider = 'java' FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Application Server CPU & Memory"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuPercent) AS 'CPU %', average(host.memoryUsedPercent) AS 'Memory %' FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "Response Rate"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT rate(count(*), 1 minute) AS 'Requests/Min' TIMESERIES FACET appName LIMIT 5"
+      }
+    }
+
+    widget_bar {
+      title  = "Session Duration"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT average(session.duration) FACET appName LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Transaction Volume"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Transaction SELECT count(*) TIMESERIES FACET appName LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "User Satisfaction Score"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM PageView SELECT percentage(count(*), WHERE duration < 3) AS 'Satisfied', percentage(count(*), WHERE duration >= 3 AND duration < 7) AS 'Tolerating', percentage(count(*), WHERE duration >= 7) AS 'Frustrated'"
+      }
+    }
+
+    widget_bar {
+      title  = "Error Logs"
+      row    = 16
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Log SELECT count(*) WHERE level = 'error' OR level = 'critical' FACET service.name LIMIT 10"
+      }
+    }
+
+    widget_area {
+      title  = "Request Rate"
+      row    = 16
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT rate(sum(http.server.requests), 1 minute) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Application Downtime"
+      row    = 19
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticCheck SELECT 100 - percentage(count(*), WHERE result = 'SUCCESS') AS 'Downtime %' FACET monitorName LIMIT 5"
+      }
+    }
+
+    widget_bar {
+      title  = "Code Deployment Frequency"
+      row    = 19
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM NrAuditEvent SELECT uniqueCount(actorEmail) WHERE actionIdentifier = 'applicationDeployment' FACET targetId LIMIT 10"
+      }
+    }
+  }
+
+  # ===== PAGE 8: Infrastructure Metrics =====
+  page {
+    name = "Infrastructure Metrics"
+
+    widget_area {
+      title  = "CPU Utilisation"
+      row    = 1
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuPercent) TIMESERIES FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Memory"
+      row    = 1
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.memoryUsedPercent) TIMESERIES FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_bar {
+      title  = "Error Rate"
+      row    = 4
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(host.systemSampleError) FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Inbound/Outbound Throughput"
+      row    = 4
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(net.receive.bytesPerSecond), average(net.transmit.bytesPerSecond) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Resource Utilisation"
+      row    = 7
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuPercent) AS 'CPU %', average(host.memoryUsedPercent) AS 'Memory %', average(host.diskUtilizationPercent) AS 'Disk %' FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_line {
+      title  = "Network Latency"
+      row    = 7
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM SyntheticRequest SELECT average(duration) TIMESERIES WHERE monitorType IN ('SIMPLE', 'BROWSER')"
+      }
+    }
+
+    widget_pie {
+      title  = "Disk I/O"
+      row    = 10
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(host.diskReadBytesPerSecond) AS 'Read', sum(host.diskWriteBytesPerSecond) AS 'Write' FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Network Throughput"
+      row    = 10
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(net.receive.bytesPerSecond), sum(net.transmit.bytesPerSecond) TIMESERIES"
+      }
+    }
+
+    widget_area {
+      title  = "Power Usage"
+      row    = 13
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuPercent) * 0.1 AS 'Estimated Power Usage (kW)' TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "System Uptime"
+      row    = 13
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT latest(host.uptimeSeconds)/86400 AS 'Uptime (Days)' FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Storage Utilisation"
+      row    = 16
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.diskUtilizationPercent) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_pie {
+      title  = "Network Errors"
+      row    = 16
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT sum(net.receive.errors), sum(net.transmit.errors) FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Heat Generation"
+      row    = 19
+      column = 1
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuTemp) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+
+    widget_billboard {
+      title  = "Virtualisation Overhead"
+      row    = 19
+      column = 5
+      width  = 4
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT average(host.cpuStolen) FACET entity.name LIMIT 10"
+      }
+    }
+
+    widget_line {
+      title  = "Hardware Health"
+      row    = 22
+      column = 1
+      width  = 8
+      height = 3
+
+      nrql_query {
+        query = "FROM Metric SELECT latest(host.diskErrorCount), latest(host.memoryErrorCount) TIMESERIES FACET entity.name LIMIT 5"
+      }
+    }
+  }
+}
